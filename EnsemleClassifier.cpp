@@ -208,14 +208,14 @@ int main(int argc, char *argv[])
                                 {
                                     int w = 0;
                                     convert_weight >> w;
-                                    result+= w;     
+                                    value += w;     
                                 }else if (weight_value_col_index == row_data_col_index) //BETA
                                 {
                                     int d = 0;
                                     convert_data >> d;
                                     int w = 0;
                                     convert_weight >> w;
-                                    result += w * d; 
+                                    value += w * d; 
                                 }
                                 row_data_col_index++;
                             }
@@ -227,7 +227,9 @@ int main(int argc, char *argv[])
                             result = weight_value_row_index;
                         }
                         weight_value_row_index++;
-                    }                    
+                    }  
+                    cout << classifier_name << " : " << result << endl;
+
                 }
                 // 1- open dataset.csv file
                 // 2- foreach rows as row
