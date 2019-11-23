@@ -2,7 +2,9 @@
 #include <stdio.h>
 #include <fstream>
 #include <string>
+#include <string.h>
 #include <sstream>
+#include <dirent.h>
 
 //pipe
 #include <fcntl.h>
@@ -116,16 +118,38 @@ int write_to_voter_named_pipe(int dataset_row, int classifier, int result){
     close(out_fd);
 }
 
-int main()
+int get_number_of_files_in_dir(char * path){
+    DIR *dp;
+    int counter = 0;
+    struct dirent *ep;
+    dp = opendir(path);
+    if (dp != NULL)
+    {
+        while(ep = readdir(dp)){
+            if (strcmp(ep->d_name, ".") && strcmp(ep->d_name, "..") != 0)
+                counter++;
+        }
+        (void) closedir(dp);
+    }else{
+        cout << "error: failed to open " << path << endl;
+        exit(1);
+    }
+    return counter;
+}
+
+int main(int argc, char *argv[])
 {
+    char* validation_path = argv[1];
+    char* weight_vectors_path = argv[2];
+    int n = get_number_of_files_in_dir(weight_vectors_path);
 
 	int *fd[10]; 
-	for(int i =0; i < 10; i++)
+	for(int i =0; i < n; i++)
 		fd[i] = new int[2];
 
 	for(int i = 0; i < 10; i++){
         if(pipe(fd[i]) == -1){
-            cout << "error in creating pipe" << endl;
+            cout << "error: failed to creating pipe" << endl;
             return 1;
         }
         int classifier_pid = fork();
@@ -185,7 +209,7 @@ int main()
     //	1- foreach lables.csv rows as row => value     
     // 		1-2 comare results[row] with value
 	// 			1-2-1 if equal count++	
-	cout << count/1002 << endl; 
+	cout << "Accuracy: "<< count/1002 << endl; 
 
 	return 0;
 }
