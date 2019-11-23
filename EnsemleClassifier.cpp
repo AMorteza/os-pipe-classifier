@@ -109,9 +109,9 @@ int write_to_voter_named_pipe(int dataset_row, char *classifier, int result){
     int out_fd;
     string value = itos(result);
     const char* pipe_name = strcat(classifier, itconstc(dataset_row));
-    cout << pipe_name << endl;  
-    if ( (out_fd = open(pipe_name, O_WRONLY)) < 0){
-        cout<<"error: failed to load named pipe" << endl;
+    out_fd = open(pipe_name, O_WRONLY);
+    if (out_fd < 0){
+        cout<<"error: failed to load named pipe: " << pipe_name<< endl;
         close(out_fd);
         return 0;
     }
@@ -177,9 +177,9 @@ int get_csv_rows_count(const char * path){
     return counter;
 }
 
-float strtof(string w)
+float strtod(string w)
 {
-    float w_int;
+    double w_int;
     istringstream ss(w);
     ss >> w_int;
     return w_int;
@@ -209,16 +209,15 @@ int main(int argc, char *argv[])
                 exit(1);
             }else{
                 close(fd[i][0]);
-                const char* tmp = ".csv";
-                char *classifier_path = strcat(classifier_name, tmp);
                 std::vector<std::vector<string>> rows, weights;
-                weights = readcsv(strcat(weight_vectors_path, classifier_path));
+                const char* tmp = ".csv";
+                weights = readcsv(strcat(weight_vectors_path, strcat(classifier_name, tmp)));
                 rows = readcsv(strcat(validation_path, "/dataset.csv"));
                 int row_index = 0;
                 for (std::vector<string> row : rows)
                 {
                     double max_result_value = -1000;
-                    float result_value = -1;
+                    double result_value = -1;
                     int result_index = -1;
                     int w_index = 0;
                     for (std::vector<string> weight : weights)
@@ -231,9 +230,9 @@ int main(int argc, char *argv[])
                             {
                                 if (row_col == w_col)
                                 {
-                                    result_value += strtof(data) * strtof(w);
+                                    result_value += strtod(data) * strtod(w);
                                 }else if(w_col == weight.size() - 1){
-                                    result_value += strtof(w);
+                                    result_value += strtod(w);
                                 }                                
                                 row_col++;
                             }
@@ -246,10 +245,10 @@ int main(int argc, char *argv[])
                         }
                         w_index++;
                     }
-                    // write_to_voter_named_pipe(row_index, classifier_name, result_index);
-                    cout << "row_index: " << row_index << " classifier_name: " << classifier_name
-                    << " result_value: " << result_value
-                    << " result_index: "<< result_index << endl;
+                    write_to_voter_named_pipe(row_index, classifier_name, result_index);
+                    // cout << "row_index: " << row_index << " classifier_name: " << classifier_name
+                    // << " result_value: " << result_value
+                    // << " result_index: "<< result_index << endl;
                     row_index++;
                 }
             }
@@ -295,6 +294,5 @@ int main(int argc, char *argv[])
     //      1-2 comare results[row] with value
     //          1-2-1 if equal count++  
     cout << "Accuracy: "<< count/1002 << endl; 
-
     return 0;
 }
