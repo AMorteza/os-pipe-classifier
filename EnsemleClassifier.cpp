@@ -87,8 +87,8 @@ int concatint(int x, int y) {
     return x * pow + y;        
 } 
 
-int read_from_voter_named_pipe(int dataset_row, int classifier){
-    const char* pipe_name = itconstc(concatint(dataset_row, classifier)); 
+int read_from_voter_named_pipe(int dataset_row, char *classifier){
+    const char* pipe_name = strcat(classifier, itconstc(dataset_row));      
     int in_fd = open(pipe_name, O_RDWR);
     if(in_fd < 0) {
         cout<<"error in load named pipe" << endl;
@@ -105,10 +105,11 @@ int read_from_voter_named_pipe(int dataset_row, int classifier){
     return result;
 }
 
-int write_to_voter_named_pipe(int dataset_row, int classifier, int result){
+int write_to_voter_named_pipe(int dataset_row, char *classifier, int result){
     int out_fd;
     string value = itos(result);
-    const char* pipe_name = itconstc(concatint(dataset_row, classifier));  
+    const char* pipe_name = strcat(classifier, itconstc(dataset_row));
+    cout << pipe_name << endl;  
     if ( (out_fd = open(pipe_name, O_WRONLY)) < 0){
         cout<<"error: failed to load named pipe" << endl;
         close(out_fd);
@@ -161,6 +162,29 @@ vector<std::vector<string>> readcsv(const char * path){
     return dataList;
 }
 
+int get_csv_rows_count(const char * path){
+    int fd = open(path, O_RDWR);
+    if(fd < 0) {
+        cout << "error: failed to open file " << path << endl;
+        exit(1);
+    }
+
+    ifstream file(path);
+    int counter = 0;
+    string line = "";
+    while(getline(file, line))
+       counter++;
+    return counter;
+}
+
+float strtof(string w)
+{
+    float w_int;
+    istringstream ss(w);
+    ss >> w_int;
+    return w_int;
+}
+
 int main(int argc, char *argv[])
 {
     char* validation_path = argv[1];
@@ -180,67 +204,60 @@ int main(int argc, char *argv[])
             close(fd[i][1]);
             char classifier_name[100];
             if (read(fd[i][0] ,&classifier_name ,100*sizeof(char)) <= 0) {
-                cout<<"error in read pipe!!"<<endl;
+                cout<<"error: failed to read pipe"<<endl;
                 close(fd[i][0]);
                 exit(1);
             }else{
                 close(fd[i][0]);
+                const char* tmp = ".csv";
+                char *classifier_path = strcat(classifier_name, tmp);
                 std::vector<std::vector<string>> rows, weights;
-                weights = readcsv(strcat(weight_vectors_path, classifier_name));
+                weights = readcsv(strcat(weight_vectors_path, classifier_path));
                 rows = readcsv(strcat(validation_path, "/dataset.csv"));
+                int row_index = 0;
                 for (std::vector<string> row : rows)
                 {
-                    int max = -1;
-                    int result = -1;
-                    int weight_value_row_index = 0;
+                    double max_result_value = -1000;
+                    float result_value = -1;
+                    int result_index = -1;
+                    int w_index = 0;
                     for (std::vector<string> weight : weights)
                     {
-                        int value = -1;
-                        int weight_value_col_index = 0;
+                        int w_col = 0;
                         for (string w : weight)
                         {
-                            stringstream convert_weight(w);
-                            int row_data_col_index = 0;
+                            int row_col = 0;  
                             for (string data : row)
                             {
-                                stringstream convert_data(data);
-                                if (row_data_col_index == weight.size() - 1) //BIAS
+                                if (row_col == w_col)
                                 {
-                                    int w = 0;
-                                    convert_weight >> w;
-                                    value += w;     
-                                }else if (weight_value_col_index == row_data_col_index) //BETA
-                                {
-                                    int d = 0;
-                                    convert_data >> d;
-                                    int w = 0;
-                                    convert_weight >> w;
-                                    value += w * d; 
-                                }
-                                row_data_col_index++;
+                                    result_value += strtof(data) * strtof(w);
+                                }else if(w_col == weight.size() - 1){
+                                    result_value += strtof(w);
+                                }                                
+                                row_col++;
                             }
-                            weight_value_col_index++;
+                            w_col++;
                         }
-                        if (max < value)
+                        if (max_result_value < result_value)
                         {
-                            max = value;
-                            result = weight_value_row_index;
+                            max_result_value = result_value;
+                            result_index = w_index;
                         }
-                        weight_value_row_index++;
-                    }  
-                    cout << classifier_name << " : " << result << endl;
-
+                        w_index++;
+                    }
+                    // write_to_voter_named_pipe(row_index, classifier_name, result_index);
+                    cout << "row_index: " << row_index << " classifier_name: " << classifier_name
+                    << " result_value: " << result_value
+                    << " result_index: "<< result_index << endl;
+                    row_index++;
                 }
-                // 1- open dataset.csv file
-                // 2- foreach rows as row
-                //  2-1 calculate row weight result  
-                //  2-2 write result to voter named pipe
             }
             exit(0);
         }
 
         close(fd[i][0]);
-        string sd = "/classifier_" + itos(i) + ".csv";
+        string sd = "/classifier_" + itos(i);
         if (write(fd[i][1], sd.c_str(), sd.size()+1) != sd.size()+1) {
             close(fd[i][1]);
             exit(1);
@@ -255,10 +272,11 @@ int main(int argc, char *argv[])
     int voter_pid = fork();
     if (voter_pid == 0)
     {
-        int *labels[1001];
-        for(int i = 0; i < 1001; i++){
-            labels[i] = new int[10];
-            for (int j = 0; j < 10; ++j)
+        int rows_count = get_csv_rows_count(strcat(validation_path, "/dataset.csv"));
+        int *labels[rows_count];
+        for(int i = 0; i < rows_count; i++){
+            labels[i] = new int[n];
+            for (int j = 0; j < n; ++j)
             {
                 int result = 0;//read_from_voter_named_pipe(i, j);
                 labels[i][j] = result;  
