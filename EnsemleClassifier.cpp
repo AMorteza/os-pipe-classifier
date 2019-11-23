@@ -14,6 +14,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <stdlib.h>
+#include <unistd.h> 
 
 //fork
 #include <sys/wait.h>
@@ -40,7 +41,8 @@ const char* itconstc(int number)
 {
     if (number == 0)
     {
-        return "0";
+        const char* c = "0";
+        return c;
     }
     const char* snum;
     while(number > 0){
@@ -86,41 +88,6 @@ int concatint(int x, int y) {
         pow *= 10;
     return x * pow + y;        
 } 
-
-int read_from_voter_named_pipe(int dataset_row, char *classifier){
-    const char* pipe_name = strcat(classifier, itconstc(dataset_row));      
-    int in_fd = open(pipe_name, O_RDWR);
-    if(in_fd < 0) {
-        cout<<"error in load named pipe" << endl;
-        exit(1);
-    }
-    int result;
-    int n;
-    char buf[2];
-    if ((n = read(in_fd, buf, 2)) > 0)
-    {
-        result = atoi(buf);
-    }
-    close(in_fd);
-    return result;
-}
-
-int write_to_voter_named_pipe(int dataset_row, char *classifier, int result){
-    int out_fd;
-    string value = itos(result);
-    const char* pipe_name = strcat(classifier, itconstc(dataset_row));
-    out_fd = open(pipe_name, O_WRONLY);
-    if (out_fd < 0){
-        cout<<"error: failed to load named pipe: " << pipe_name<< endl;
-        close(out_fd);
-        return 0;
-    }
-    if (write(out_fd,value.c_str(), value.size()+1) != value.size()+1) { 
-        close(out_fd);
-        return 1;
-    }
-    close(out_fd);
-}
 
 int get_number_of_files_in_dir(char * path){
     DIR *dp;
@@ -185,6 +152,29 @@ float strtod(string w)
     return w_int;
 }
 
+int read_from_voter_named_pipe(int row_index, char *classifier_name){
+    const char* pipe_name = strcat(classifier_name, itconstc(row_index)); 
+    ifstream infile(pipe_name, ios::out);
+    if(!infile) {
+      cout << "error: can'nt open file to read!" << endl;
+      return -1;
+    }
+    return 0;
+}
+
+int write_to_voter_named_pipe(int row_index, char* classifier_name, int result_index){
+    const char* pipe_name = strcat(classifier_name, itconstc(row_index));
+    ofstream outfile (pipe_name, ios::out);
+    if(!outfile) {
+      cout << "error: can'nt open file to write!" << endl;
+      return -1;
+    }
+    const char* c = itconstc(result_index);
+    outfile.write (c, strlen(c));
+    outfile.close();
+    return 1;
+}
+
 int main(int argc, char *argv[])
 {
     char* validation_path = argv[1];
@@ -246,9 +236,6 @@ int main(int argc, char *argv[])
                         w_index++;
                     }
                     write_to_voter_named_pipe(row_index, classifier_name, result_index);
-                    // cout << "row_index: " << row_index << " classifier_name: " << classifier_name
-                    // << " result_value: " << result_value
-                    // << " result_index: "<< result_index << endl;
                     row_index++;
                 }
             }
@@ -277,7 +264,11 @@ int main(int argc, char *argv[])
             labels[i] = new int[n];
             for (int j = 0; j < n; ++j)
             {
-                int result = 0;//read_from_voter_named_pipe(i, j);
+                string tmp_s = "/classifier_" + itos(j) + ".csv";
+                char char_array[tmp_s.length() + 1]; 
+                strcpy(char_array, tmp_s.c_str());
+                int result = read_from_voter_named_pipe(i, char_array);
+                cout << result << endl;
                 labels[i][j] = result;  
             }
         }
@@ -288,7 +279,6 @@ int main(int argc, char *argv[])
     }
     wait(NULL);
     cout << "voter sub-proccess is done." << endl;
-    
     float count = 0;
     //  1- foreach lables.csv rows as row => value     
     //      1-2 comare results[row] with value
