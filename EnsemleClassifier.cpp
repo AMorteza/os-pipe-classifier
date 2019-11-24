@@ -8,6 +8,7 @@
 #include <vector>
 #include <iterator>
 #include <algorithm>
+#include <iomanip>
 
 //pipe
 #include <fcntl.h>
@@ -144,15 +145,13 @@ int get_csv_rows_count(const char * path){
     return counter;
 }
 
-float strtod(string w)
+long double strtol(string item)
 {
-    double w_int;
-    istringstream ss(w);
-    ss >> w_int;
-    return w_int;
+     char * e;
+    return strtold(item.c_str(), &e);
 }
 
-int read_from_voter_named_pipe(const char* pipe_name){
+int read_from_named_pipe(const char* pipe_name){
     string str = "./pipe_";
     char *cstr = &str[0];
     strcat(cstr, pipe_name);
@@ -165,7 +164,7 @@ int read_from_voter_named_pipe(const char* pipe_name){
     return num;
 }
 
-int write_to_voter_named_pipe(const char* pipe_name, int result_index){
+int write_to_named_pipe(const char* pipe_name, int result_index){
     string str = "./pipe_";
     char *cstr = &str[0];
     strcat(cstr, pipe_name);
@@ -174,6 +173,32 @@ int write_to_voter_named_pipe(const char* pipe_name, int result_index){
     fprintf(fp, "%s", value.c_str());
     fclose(fp);
 }
+
+
+int get_most_repeated(int arr[], int n) 
+{ 
+    sort(arr, arr + n); 
+    int max_count = 1, res = arr[0], curr_count = 1; 
+    for (int i = 1; i < n; i++) { 
+        if (arr[i] == arr[i - 1]) 
+            curr_count++; 
+        else { 
+            if (curr_count > max_count) { 
+                max_count = curr_count; 
+                res = arr[i - 1]; 
+            } 
+            curr_count = 1; 
+        } 
+    } 
+  
+    if (curr_count > max_count) 
+    { 
+        max_count = curr_count; 
+        res = arr[n - 1]; 
+    } 
+  
+    return res; 
+} 
 
 int main(int argc, char *argv[])
 {
@@ -199,7 +224,7 @@ int main(int argc, char *argv[])
                 exit(1);
             }else{
                 close(fd[i][0]);
-                std::vector<std::vector<string>> rows, weights;
+                vector<std::vector<string>> rows, weights;
                 const char* ext = ".csv";
                 const char* path = "/classifier_";
                 int c_index = atoi(classifier_index);
@@ -208,13 +233,13 @@ int main(int argc, char *argv[])
                 strcat(classifier_index, ext)));
                 rows = readcsv(strcat(validation_path, "/dataset.csv"));
                 int row_index = 0;
-                for (std::vector<string> row : rows)
+                for (vector<string> row : rows)
                 {
-                    double max_result_value = -1000;
-                    double result_value = -1;
+                    long double max_result_value = -1000;
+                    long double result_value = -1;
                     int result_index = -1;
                     int w_index = 0;
-                    for (std::vector<string> weight : weights)
+                    for (vector<string> weight : weights)
                     {
                         int w_col = 0;
                         for (string w : weight)
@@ -224,9 +249,9 @@ int main(int argc, char *argv[])
                             {
                                 if (row_col == w_col)
                                 {
-                                    result_value += strtod(data) * strtod(w);
+                                    result_value += strtol(data) * strtol(w);
                                 }else if(w_col == weight.size() - 1){
-                                    result_value += strtod(w);
+                                    result_value += strtol(w);
                                 }                                
                                 row_col++;
                             }
@@ -240,7 +265,7 @@ int main(int argc, char *argv[])
                         w_index++;
                     }
                     const char* pipe_name = (itos(row_index) + "_" + itos(c_index)).c_str();
-                    write_to_voter_named_pipe(pipe_name, result_index);
+                    write_to_named_pipe(pipe_name, result_index);
                     row_index++;
                 }
             }
@@ -258,7 +283,7 @@ int main(int argc, char *argv[])
 
     for(int i = 0; i < 10; i++)
         wait(NULL);
-    cout << "linear classifiers sub-proccess are done." << endl;
+    // cout << "linear classifiers sub-proccess are done." << endl;
 
     int voter_pid = fork();
     if (voter_pid == 0)
@@ -267,24 +292,36 @@ int main(int argc, char *argv[])
         int *labels[rows_count];
         for(int i = 0; i < rows_count; i++){
             labels[i] = new int[n];
-            for (int j = 0; j < n; ++j)
+            int j = 0;
+            for (j; j < n; ++j)
             {
                 const char* pipe_name = (itos(i) + "_" + itos(j)).c_str();
-                int result = read_from_voter_named_pipe(pipe_name);
+                int result = read_from_named_pipe(pipe_name);
                 labels[i][j] = result;
             }
+            int vote = get_most_repeated(labels[i], j);
+            const char* pipe_name = (itos(i) + "_vote").c_str();
+            write_to_named_pipe(pipe_name, vote);
         }
-        //  1- foreach lables rows as row
-        //      1-1 find most repeated as result
-        //          1-1-1 pass result to parent process with named pipe with 
         exit(0);
     }
     wait(NULL);
-    cout << "voter sub-proccess is done." << endl;
-    float count = 0;
-    //  1- foreach lables.csv rows as row => value     
-    //      1-2 comare results[row] with value
-    //          1-2-1 if equal count++  
-    cout << "Accuracy: "<< count/1002 << endl;  
+    // cout << "voter sub-proccess is done." << endl;
+    vector<std::vector<string>> label_rows;    
+    label_rows = readcsv(strcat(validation_path, "/labels.csv"));
+    int row_index = 0;
+    int count = 0;
+    for (std::vector<string> label_columns : label_rows)
+    {
+        for (string true_value : label_columns)
+        {
+            const char* pipe_name = (itos(row_index) + "_vote").c_str();
+            int vote = read_from_named_pipe(pipe_name);
+            if (strcmp(itos(vote).c_str(), true_value.c_str()) == 0)
+                count++;
+        }
+        row_index++;
+    }
+    cout << "Accuracy: "<< setprecision(2) << (float)count/(row_index+1) << endl;  
     return 0;
 }
