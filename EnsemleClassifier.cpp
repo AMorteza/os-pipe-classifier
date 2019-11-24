@@ -152,27 +152,27 @@ float strtod(string w)
     return w_int;
 }
 
-int read_from_voter_named_pipe(int row_index, char *classifier_name){
-    const char* pipe_name = strcat(classifier_name, itconstc(row_index)); 
-    ifstream infile(pipe_name, ios::out);
-    if(!infile) {
-      cout << "error: can'nt open file to read!" << endl;
-      return -1;
-    }
-    return 0;
+int read_from_voter_named_pipe(const char* pipe_name){
+    string str = "./pipe_";
+    char *cstr = &str[0];
+    strcat(cstr, pipe_name);
+    FILE* fp = fopen(cstr, "r");
+    char line[256];
+    int num = 0;
+    while ( fgets(line, 255, fp) != NULL )
+        sscanf(line, "%d", &num);
+    fclose(fp);
+    return num;
 }
 
-int write_to_voter_named_pipe(int row_index, char* classifier_name, int result_index){
-    const char* pipe_name = strcat(classifier_name, itconstc(row_index));
-    ofstream outfile (pipe_name, ios::out);
-    if(!outfile) {
-      cout << "error: can'nt open file to write!" << endl;
-      return -1;
-    }
-    const char* c = itconstc(result_index);
-    outfile.write (c, strlen(c));
-    outfile.close();
-    return 1;
+int write_to_voter_named_pipe(const char* pipe_name, int result_index){
+    string str = "./pipe_";
+    char *cstr = &str[0];
+    strcat(cstr, pipe_name);
+    FILE* fp = fopen(cstr, "w");
+    string value = itos(result_index);
+    fprintf(fp, "%s", value.c_str());
+    fclose(fp);
 }
 
 int main(int argc, char *argv[])
@@ -192,16 +192,20 @@ int main(int argc, char *argv[])
         int classifier_pid = fork();
         if (classifier_pid == 0) {
             close(fd[i][1]);
-            char classifier_name[100];
-            if (read(fd[i][0] ,&classifier_name ,100*sizeof(char)) <= 0) {
+            char classifier_index[100];
+            if (read(fd[i][0] ,&classifier_index ,100*sizeof(char)) <= 0) {
                 cout<<"error: failed to read pipe"<<endl;
                 close(fd[i][0]);
                 exit(1);
             }else{
                 close(fd[i][0]);
                 std::vector<std::vector<string>> rows, weights;
-                const char* tmp = ".csv";
-                weights = readcsv(strcat(weight_vectors_path, strcat(classifier_name, tmp)));
+                const char* ext = ".csv";
+                const char* path = "/classifier_";
+                int c_index = atoi(classifier_index);
+
+                weights = readcsv(strcat(strcat(weight_vectors_path, path),
+                strcat(classifier_index, ext)));
                 rows = readcsv(strcat(validation_path, "/dataset.csv"));
                 int row_index = 0;
                 for (std::vector<string> row : rows)
@@ -235,7 +239,8 @@ int main(int argc, char *argv[])
                         }
                         w_index++;
                     }
-                    write_to_voter_named_pipe(row_index, classifier_name, result_index);
+                    const char* pipe_name = (itos(row_index) + "_" + itos(c_index)).c_str();
+                    write_to_voter_named_pipe(pipe_name, result_index);
                     row_index++;
                 }
             }
@@ -243,8 +248,8 @@ int main(int argc, char *argv[])
         }
 
         close(fd[i][0]);
-        string sd = "/classifier_" + itos(i);
-        if (write(fd[i][1], sd.c_str(), sd.size()+1) != sd.size()+1) {
+        string file_index = itos(i);
+        if (write(fd[i][1], file_index.c_str(), file_index.size()+1) != file_index.size()+1) {
             close(fd[i][1]);
             exit(1);
         }
@@ -264,12 +269,9 @@ int main(int argc, char *argv[])
             labels[i] = new int[n];
             for (int j = 0; j < n; ++j)
             {
-                string tmp_s = "/classifier_" + itos(j) + ".csv";
-                char char_array[tmp_s.length() + 1]; 
-                strcpy(char_array, tmp_s.c_str());
-                int result = read_from_voter_named_pipe(i, char_array);
-                cout << result << endl;
-                labels[i][j] = result;  
+                const char* pipe_name = (itos(i) + "_" + itos(j)).c_str();
+                int result = read_from_voter_named_pipe(pipe_name);
+                labels[i][j] = result;
             }
         }
         //  1- foreach lables rows as row
@@ -283,6 +285,6 @@ int main(int argc, char *argv[])
     //  1- foreach lables.csv rows as row => value     
     //      1-2 comare results[row] with value
     //          1-2-1 if equal count++  
-    cout << "Accuracy: "<< count/1002 << endl; 
+    cout << "Accuracy: "<< count/1002 << endl;  
     return 0;
 }
