@@ -147,7 +147,7 @@ int get_csv_rows_count(const char * path){
 
 long double strtol(string item)
 {
-     char * e;
+    char * e;
     return strtold(item.c_str(), &e);
 }
 
