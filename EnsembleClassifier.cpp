@@ -119,13 +119,17 @@ vector<std::vector<string>> readcsv(const char * path){
     ifstream file(path);
     std::vector<std::vector<string>> dataList;
     string word, line = "";
+    int c = 0;
     while(getline(file, line))
     {
-        stringstream s(line);
-        std::vector<string> v;
-        while(getline(s, word, ','))
-            v.push_back(word);
-        dataList.push_back(v);
+    	if(c == 1){    
+             stringstream s(line);
+             std::vector<string> v;
+             while(getline(s, word, ','))
+                v.push_back(word);
+             dataList.push_back(v);
+    	}
+	   c = 1;
     }
     return dataList;
 }
@@ -145,10 +149,11 @@ int get_csv_rows_count(const char * path){
     return counter;
 }
 
-long double strtol(string item)
+long double strtol(string item, int w_col)
 {
     long double d;
     istringstream(item) >> d;  
+    cout << item << " : " << w_col << endl;
     return d;
 }
 
@@ -250,9 +255,9 @@ int main(int argc, char *argv[])
                             {
                                 if (row_col == w_col)
                                 {
-                                    result_value += strtol(data) * strtol(w);
+                                    result_value += strtol(data, w_col) * strtol(w, w_col);
                                 }else if(w_col == weight.size() - 1){
-                                    result_value += strtol(w);
+                                    result_value += strtol(w, w_col);
                                 }                                
                                 row_col++;
                             }
