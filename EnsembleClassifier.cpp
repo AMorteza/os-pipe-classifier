@@ -147,8 +147,9 @@ int get_csv_rows_count(const char * path){
 
 long double strtol(string item)
 {
-    char * e;
-    return strtold(item.c_str(), &e);
+    long double d;
+    istringstream(item) >> d;  
+    return d;
 }
 
 int read_from_named_pipe(const char* pipe_name){
@@ -322,6 +323,7 @@ int main(int argc, char *argv[])
         }
         row_index++;
     }
-    cout << "Accuracy: "<< setprecision(2) << (float)count/(row_index+1) << endl;  
+    cout << "Accuracy: " << setprecision(4) << (((float)count * 100 )/(row_index+1)) 
+    << "%" << endl;  
     return 0;
 }
