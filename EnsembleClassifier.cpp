@@ -152,8 +152,7 @@ int get_csv_rows_count(const char * path){
 long double strtol(string item, int w_col)
 {
     long double d;
-    istringstream(item) >> d;  
-    cout << item << " : " << w_col << endl;
+    istringstream(item) >> d;
     return d;
 }
 
