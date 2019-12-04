@@ -214,7 +214,7 @@ int main(int argc, char *argv[])
     for(int i =0; i < n; i++)
         fd[i] = new int[2];
 
-    for(int i = 0; i < 10; i++){
+    for(int i = 0; i < n; i++){
         if(pipe(fd[i]) == -1){
             cout << "error: failed to creating pipe" << endl;
             return 1;
