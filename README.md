@@ -1,4 +1,4 @@
-First compile use g++ and c++11:
+Compile the code using g++ and c++11:
 
 `make`
 
